@@ -1,0 +1,27 @@
+{
+  "name": "milpa/event-store",
+  "description": "Append-only event-log primitive for the Milpa PHP framework: durable JSONL file store and in-memory store behind a common EventStoreInterface \u2014 per-stream replay and store-wide monotonic sequencing.",
+  "type": "library",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.3"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.5",
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpdoc-parser": "^2.3",
+    "friendsofphp/php-cs-fixer": "^3.65",
+    "milpa/core": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Milpa\\EventStore\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Milpa\\EventStore\\Tests\\": "tests/",
+      "Milpa\\Docs\\": "vendor/milpa/core/tools/gen-docs/"
+    }
+  }
+}
