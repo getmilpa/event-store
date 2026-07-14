@@ -3,6 +3,12 @@
   "description": "Append-only event-log primitive for the Milpa PHP framework: durable JSONL file store and in-memory store behind a common EventStoreInterface \u2014 per-stream replay and store-wide monotonic sequencing.",
   "type": "library",
   "license": "Apache-2.0",
+  "authors": [
+    {
+      "name": "Rodrigo Vicente - TeamX Agency",
+      "homepage": "https://teamx.agency"
+    }
+  ],
   "require": {
     "php": ">=8.3"
   },
