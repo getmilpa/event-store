@@ -120,7 +120,7 @@ final class FileEventStore implements EventStoreInterface
     }
 
     /**
-     * @return list<array{stream_id: string, type: string, payload: array<string,mixed>, seq: int}>
+     * @return list<array{stream_id: string, type: string, payload: array<string,mixed>, seq: int, recorded_at?: ?string}>
      */
     private function readRows(): array
     {

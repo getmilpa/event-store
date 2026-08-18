@@ -18,9 +18,14 @@
 [![Docs](https://img.shields.io/badge/docs-API%20reference-blue.svg)](https://getmilpa.github.io/event-store/)
 
 `milpa/event-store` is the smallest possible seam onto an append-only log: an `Event` is an
-immutable fact — `streamId`, `type`, `payload`, `seq` — and a store's only two jobs are
+immutable fact — `streamId`, `type`, `payload`, `seq`, `recordedAt` — and a store's only two jobs are
 "append durably" and "read a stream back in order". **No ORM, no serializer, no framework
 coupling** — construct a store with a path (or nothing at all) and call `append()`.
+
+`recordedAt` is a UTC-serialized wall-clock observation made by the process constructing a new
+event. It says when that process's clock observed the record, not when the domain event objectively
+happened, and it is no more trustworthy than that process and clock. Legacy records replay with
+`recordedAt === null`; the store never invents their time from filenames, file metadata, or payloads.
 
 ## Install
 
