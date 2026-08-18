@@ -42,6 +42,32 @@ final class FileEventStoreTest extends EventStoreContractTestCase
         $this->assertCount(5, $lines);
     }
 
+    public function testAnAppendedLineCarriesTheRecordedWallClock(): void
+    {
+        $store = new FileEventStore($this->path);
+        $recordedAt = new \DateTimeImmutable('2026-08-17T20:00:00.123456-06:00');
+
+        $store->append(new Event('A', 'StreamStarted', [], $store->nextSeq(), $recordedAt));
+
+        $line = json_decode((string) file_get_contents($this->path), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame('2026-08-18T02:00:00.123456Z', $line['recorded_at'] ?? null);
+    }
+
+    public function testALegacyLineReplaysWithAnUnknownWallClock(): void
+    {
+        file_put_contents($this->path, json_encode([
+            'stream_id' => 'A',
+            'type' => 'StreamStarted',
+            'payload' => [],
+            'seq' => 1,
+        ], JSON_THROW_ON_ERROR) . "\n");
+
+        $event = (new FileEventStore($this->path))->replay('A')[0];
+
+        $this->assertNull($event->recordedAt);
+    }
+
     public function testAFreshFileEventStoreOverTheSameFileReplaysIdentically(): void
     {
         $store = new FileEventStore($this->path);
