@@ -100,4 +100,32 @@ abstract class EventStoreContractTestCase extends TestCase
 
         $this->assertSame([], $store->streams());
     }
+
+    public function testReplayAllGroupsEveryStreamInFirstAppearanceOrderEachInSeqOrder(): void
+    {
+        $store = $this->createStore();
+
+        $store->append(new Event('B', 'StreamStarted', [], $store->nextSeq())); // seq 1
+        $store->append(new Event('A', 'StreamStarted', [], $store->nextSeq())); // seq 2
+        $store->append(new Event('B', 'submit', [], $store->nextSeq()));         // seq 3
+        $store->append(new Event('A', 'grant', [], $store->nextSeq()));          // seq 4
+
+        $all = $store->replayAll();
+
+        // The keys are every stream, in the SAME first-appearance order as streams().
+        $this->assertSame(['B', 'A'], array_keys($all));
+
+        // Each stream carries exactly its own events, in seq order — identical to replay(), but the
+        // whole store is read in a single pass instead of once per stream.
+        foreach (['A', 'B'] as $id) {
+            $this->assertEquals($store->replay($id), $all[$id], "replayAll()[$id] must equal replay($id)");
+        }
+        $this->assertSame([1, 3], array_map(static fn (Event $e): int => $e->seq, $all['B']));
+        $this->assertSame([2, 4], array_map(static fn (Event $e): int => $e->seq, $all['A']));
+    }
+
+    public function testReplayAllIsEmptyForAnEmptyStore(): void
+    {
+        $this->assertSame([], $this->createStore()->replayAll());
+    }
 }
