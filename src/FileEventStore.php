@@ -112,6 +112,28 @@ final class FileEventStore implements EventStoreInterface
     }
 
     /**
+     * Every stream replayed in a single pass — see {@see EventStoreInterface::replayAll()}. Reads the
+     * file ONCE and buckets by stream, where a `replay()`-per-stream loop would read it once per
+     * stream.
+     *
+     * @return array<string, list<Event>>
+     */
+    public function replayAll(): array
+    {
+        $byStream = [];
+        foreach ($this->readAll() as $event) {
+            $byStream[$event->streamId][] = $event;
+        }
+
+        foreach ($byStream as &$events) {
+            usort($events, static fn (Event $a, Event $b): int => $a->seq <=> $b->seq);
+        }
+        unset($events);
+
+        return $byStream;
+    }
+
+    /**
      * @return list<Event>
      */
     private function readAll(): array

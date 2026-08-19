@@ -50,4 +50,18 @@ interface EventStoreInterface
      * @return list<string>
      */
     public function streams(): array;
+
+    /**
+     * Every stream in the store replayed in a SINGLE pass: a map of stream id to that stream's
+     * events in ascending `seq` order, keyed in first-appearance order (the same order as
+     * {@see self::streams()}) — `[]` for an empty store.
+     *
+     * Behaves exactly like calling {@see self::replay()} once per {@see self::streams()} entry, but
+     * reads the underlying store ONCE instead of once per stream. That is the whole reason it exists:
+     * listing every stream via `replay()` in a loop is O(streams) full scans, which turns
+     * quadratic when a consumer reconstructs many streams at once.
+     *
+     * @return array<string, list<Event>>
+     */
+    public function replayAll(): array;
 }

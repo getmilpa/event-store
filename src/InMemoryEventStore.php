@@ -80,4 +80,24 @@ final class InMemoryEventStore implements EventStoreInterface
 
         return $ids;
     }
+
+    /**
+     * Every stream replayed in a single pass — see {@see EventStoreInterface::replayAll()}.
+     *
+     * @return array<string, list<Event>>
+     */
+    public function replayAll(): array
+    {
+        $byStream = [];
+        foreach ($this->events as $event) {
+            $byStream[$event->streamId][] = $event;
+        }
+
+        foreach ($byStream as &$events) {
+            usort($events, static fn (Event $a, Event $b): int => $a->seq <=> $b->seq);
+        }
+        unset($events);
+
+        return $byStream;
+    }
 }
