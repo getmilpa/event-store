@@ -19,7 +19,7 @@ namespace Milpa\EventStore;
  * {@see FileEventStore}, kept entirely in process memory. For tests and zero-file consumers —
  * nothing is written to disk and nothing survives past the instance's lifetime.
  */
-final class InMemoryEventStore implements EventStoreInterface
+final class InMemoryEventStore implements EventStoreInterface, FirstEventInterface
 {
     /** @var list<Event> */
     private array $events = [];
@@ -47,6 +47,20 @@ final class InMemoryEventStore implements EventStoreInterface
         usort($events, static fn (Event $a, Event $b): int => $a->seq <=> $b->seq);
 
         return $events;
+    }
+
+    /**
+     * The first event of `$type` appended to `$streamId`, or `null` when the stream holds none.
+     */
+    public function first(string $streamId, string $type): ?Event
+    {
+        foreach ($this->events as $event) {
+            if ($event->streamId === $streamId && $event->type === $type) {
+                return $event;
+            }
+        }
+
+        return null;
     }
 
     /**
