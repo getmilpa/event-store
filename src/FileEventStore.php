@@ -26,7 +26,7 @@ namespace Milpa\EventStore;
  * what was appended since: every call checks that it is still the same file, no shorter, with the
  * same last line, and reads it again from the start when it is not.
  */
-final class FileEventStore implements EventStoreInterface
+final class FileEventStore implements EventStoreInterface, FirstEventInterface
 {
     /**
      * Where the last read of the log ended, and the file it read — `null` before any read or once
@@ -114,6 +114,48 @@ final class FileEventStore implements EventStoreInterface
         $this->kept = $this->position === null ? null : ['stream' => $streamId, 'events' => $events];
 
         return $events;
+    }
+
+    /**
+     * The first event of `$type` appended to `$streamId`, read from the top of the log a line at a
+     * time and no further than that event — never the whole stream (greenhouse evidence/1045 §3: the
+     * check that only wanted a session's opener built all 293 MB of it and died there).
+     *
+     * The remembered read is left as it was: this read stops early, so it knows nothing about where
+     * the log ends.
+     */
+    public function first(string $streamId, string $type): ?Event
+    {
+        if (!is_file($this->path)) {
+            return null;
+        }
+
+        $handle = fopen($this->path, 'r');
+        if ($handle === false) {
+            throw new \RuntimeException("Unable to open event store file: {$this->path}");
+        }
+
+        try {
+            if (!flock($handle, LOCK_SH)) {
+                throw new \RuntimeException("Unable to lock event store file: {$this->path}");
+            }
+
+            while (($line = fgets($handle)) !== false) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
+                }
+                $row = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if (is_array($row) && ($row['stream_id'] ?? null) === $streamId && ($row['type'] ?? null) === $type) {
+                    return Event::fromArray($row);
+                }
+            }
+
+            return null;
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 
     /**

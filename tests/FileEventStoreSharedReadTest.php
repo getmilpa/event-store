@@ -253,6 +253,73 @@ final class FileEventStoreSharedReadTest extends TestCase
     }
 
     /**
+     * The opening of a stream is read without the stream (greenhouse evidence/1045 §3): `first()` stops at its row.
+     */
+    public function testFirstReadsOnlyAsFarAsTheEventItAnswers(): void
+    {
+        $rows = $this->row('A', 1, 'opened', ['by' => 'a']);
+        $upTo = \strlen($rows);
+        for ($i = 2; $i <= 400; ++$i) {
+            $rows .= $this->row('A', $i, 'said', ['text' => str_repeat('w', 1000)]);
+        }
+        file_put_contents($this->file, $rows);
+        $store = new FileEventStore($this->path);
+
+        CountingFile::$read = 0;
+        $opening = $store->first('A', 'opened');
+
+        self::assertSame(['by' => 'a'], $opening?->payload);
+        // The stream buffer reads ahead in chunks of 8 KiB; the log is ~400 KiB.
+        self::assertLessThanOrEqual($upTo + 8192, CountingFile::$read, 'no further than the chunk that holds the opening');
+
+        CountingFile::$read = 0;
+        self::assertNull($store->first('A', 'closed'));
+        self::assertSame(filesize($this->file), CountingFile::$read, 'a type the stream never recorded is looked for to the end');
+    }
+
+    /**
+     * `first()` stops early, so it cannot say where the log ends: the remembered read stays as it was.
+     */
+    public function testFirstLeavesTheRememberedReadAsItWas(): void
+    {
+        $this->seed(['A' => 30, 'B' => 30]);
+        $store = new FileEventStore($this->path);
+        $kept = $store->replay('A');
+
+        $store->first('B', 'seeded');
+        CountingFile::$read = 0;
+        $again = $store->replay('A');
+
+        self::assertSame($kept[0], $again[0], 'still the kept copy');
+        self::assertLessThan(200, CountingFile::$read, 'and still only the last line is read to recognise the file');
+        self::assertSame(61, $store->nextSeq());
+    }
+
+    /**
+     * What the check that only wanted an opener used to cost: a whole decoded stream. `first()` holds one row.
+     */
+    public function testFirstHoldsOneRowNotTheStream(): void
+    {
+        $rows = $this->row('A', 1, 'opened', ['by' => 'a']);
+        for ($i = 2; $i <= 1500; ++$i) {
+            $rows .= $this->row('A', $i, 'said', ['text' => str_repeat('r', 2000)]);
+        }
+        file_put_contents($this->file, $rows);
+
+        $base = memory_get_usage();
+        $opening = (new FileEventStore($this->file))->first('A', 'opened');
+        $held = memory_get_usage() - $base;
+
+        self::assertNotNull($opening);
+        self::assertLessThan(64 * 1024, $held, sprintf('first() held %.1f KB of a %.1f MB stream', $held / 1024, filesize($this->file) / 1048576));
+    }
+
+    public function testFirstOfAMissingLogIsNull(): void
+    {
+        self::assertNull((new FileEventStore($this->file . '.missing'))->first('A', 'opened'));
+    }
+
+    /**
      * @param array<string, int> $streams stream id → how many events, interleaved one of each in turn
      */
     private function seed(array $streams): void

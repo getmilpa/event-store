@@ -6,6 +6,7 @@ namespace Milpa\EventStore\Tests;
 
 use Milpa\EventStore\Event;
 use Milpa\EventStore\EventStoreInterface;
+use Milpa\EventStore\FirstEventInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -16,6 +17,25 @@ use PHPUnit\Framework\TestCase;
 abstract class EventStoreContractTestCase extends TestCase
 {
     abstract protected function createStore(): EventStoreInterface;
+
+    public function testFirstAnswersTheFirstEventOfItsTypeInItsStreamAndNothingElse(): void
+    {
+        $store = $this->createStore();
+        self::assertInstanceOf(FirstEventInterface::class, $store);
+
+        $store->append(new Event('B', 'opened', ['by' => 'b'], $store->nextSeq()));
+        $store->append(new Event('A', 'noted', ['n' => 0], $store->nextSeq()));
+        $store->append(new Event('A', 'opened', ['by' => 'a'], $store->nextSeq()));
+        $store->append(new Event('A', 'opened', ['by' => 'later'], $store->nextSeq()));
+
+        $opening = $store->first('A', 'opened');
+
+        self::assertNotNull($opening);
+        self::assertSame(['A', 'opened', ['by' => 'a'], 3], [$opening->streamId, $opening->type, $opening->payload, $opening->seq]);
+        self::assertEquals($opening, array_values(array_filter($store->replay('A'), static fn (Event $e): bool => $e->type === 'opened'))[0], 'the same event a replay puts first');
+        self::assertNull($store->first('A', 'closed'), 'a type the stream never recorded');
+        self::assertNull($store->first('C', 'opened'), 'a stream that does not exist');
+    }
 
     public function testReplayReturnsOnlyTheGivenStreamsEventsInSeqOrder(): void
     {
