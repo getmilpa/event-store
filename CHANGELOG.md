@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/getmilpa/event-store/compare/v0.3.1...v0.3.2) (2026-09-29)
+
+
+### Performance Improvements
+
+* **store:** read the log once and share it — later calls read only what was appended ([#11](https://github.com/getmilpa/event-store/issues/11)) ([680b283](https://github.com/getmilpa/event-store/commit/680b283a92d8c29ce2b5a285068c38814e6029e6))
+
 ## [0.3.1](https://github.com/getmilpa/event-store/compare/v0.3.0...v0.3.1) (2026-09-29)
 
 
