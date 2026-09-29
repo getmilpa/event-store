@@ -83,6 +83,32 @@ final class FileEventStoreTest extends EventStoreContractTestCase
         $this->assertSame(3, $fresh->nextSeq(), 'nextSeq must continue from the persisted log, not reset');
     }
 
+    /**
+     * Numbering the next event and replaying one stream read the log a line at a time (greenhouse evidence/1042):
+     * a long agent session died at PHP's 128 MB on an append, because every append decoded the whole ledger —
+     * every stream — to find the highest `seq`.
+     */
+    public function testNextSeqAndReplayDoNotHoldTheWholeLogInMemory(): void
+    {
+        $rows = '';
+        for ($i = 1; $i <= 2000; ++$i) {
+            $rows .= json_encode(['stream_id' => 'other', 'type' => 'noise', 'payload' => ['result' => str_repeat('r', 4000)], 'seq' => $i]) . "\n";
+        }
+        $rows .= json_encode(['stream_id' => 'mine', 'type' => 'kept', 'payload' => [], 'seq' => 2001]) . "\n";
+        file_put_contents($this->path, $rows);
+        $store = new FileEventStore($this->path);
+
+        $base = memory_get_usage();
+        memory_reset_peak_usage();
+        $next = $store->nextSeq();
+        $mine = $store->replay('mine');
+        $peak = memory_get_peak_usage() - $base;
+
+        $this->assertSame(2002, $next);
+        $this->assertSame(['kept'], array_map(static fn (Event $e): string => $e->type, $mine));
+        $this->assertLessThan(1024 * 1024, $peak, sprintf('this 8 MB log read whole cost ~10 MB (measured on 0.3.0); a line at a time it cost %.1f MB', $peak / 1048576));
+    }
+
     public function testNextSeqIsOneForAMissingLogFile(): void
     {
         $store = new FileEventStore($this->path);
