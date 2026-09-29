@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/getmilpa/event-store/compare/v0.3.0...v0.3.1) (2026-09-29)
+
+
+### Performance Improvements
+
+* **store:** number and replay by reading the log a line at a time ([#9](https://github.com/getmilpa/event-store/issues/9)) ([693e935](https://github.com/getmilpa/event-store/commit/693e935d1c5a35a776976fbda794317635f68019))
+
 ## [0.3.0](https://github.com/getmilpa/event-store/compare/v0.2.0...v0.3.0) (2026-08-19)
 
 
