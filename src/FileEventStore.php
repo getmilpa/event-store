@@ -69,10 +69,14 @@ final class FileEventStore implements EventStoreInterface
      */
     public function replay(string $streamId): array
     {
-        $events = array_values(array_filter(
-            $this->readAll(),
-            static fn (Event $event): bool => $event->streamId === $streamId,
-        ));
+        // Only the stream's own rows become events: the log holds every stream of the house, and building
+        // all of them to keep one cost a 21 MB ledger ~26 MB per read (greenhouse evidence/1042).
+        $events = [];
+        $this->scan(static function (array $row) use ($streamId, &$events): void {
+            if (($row['stream_id'] ?? null) === $streamId) {
+                $events[] = Event::fromArray($row);
+            }
+        });
 
         usort($events, static fn (Event $a, Event $b): int => $a->seq <=> $b->seq);
 
@@ -85,10 +89,14 @@ final class FileEventStore implements EventStoreInterface
      */
     public function nextSeq(): int
     {
+        // One line at a time: numbering the next event needs the highest `seq`, not the whole log in memory.
+        // Every append asks this, so it used to decode the entire file — every stream — into rows AND events;
+        // on a 21 MB ledger that was ~26 MB per append, and a long agent session died at PHP's 128 MB on an
+        // append (greenhouse evidence/1042).
         $max = 0;
-        foreach ($this->readAll() as $event) {
-            $max = max($max, $event->seq);
-        }
+        $this->scan(static function (array $row) use (&$max): void {
+            $max = max($max, (int) ($row['seq'] ?? 0));
+        });
 
         return $max + 1;
     }
@@ -139,6 +147,45 @@ final class FileEventStore implements EventStoreInterface
     private function readAll(): array
     {
         return array_map(Event::fromArray(...), $this->readRows());
+    }
+
+    /**
+     * Visit every row of the log, decoded one line at a time under a shared lock — the same rows
+     * {@see self::readRows()} would return, without holding them all at once.
+     *
+     * @param callable(array<string,mixed>): void $visit
+     */
+    private function scan(callable $visit): void
+    {
+        if (!is_file($this->path)) {
+            return;
+        }
+
+        $handle = fopen($this->path, 'r');
+        if ($handle === false) {
+            throw new \RuntimeException("Unable to open event store file: {$this->path}");
+        }
+
+        try {
+            if (!flock($handle, LOCK_SH)) {
+                throw new \RuntimeException("Unable to lock event store file: {$this->path}");
+            }
+
+            while (($line = fgets($handle)) !== false) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
+                }
+
+                $decoded = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                if (is_array($decoded)) {
+                    $visit($decoded);
+                }
+            }
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 
     /**
