@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/getmilpa/event-store/compare/v0.3.2...v0.4.0) (2026-09-29)
+
+
+### Features
+
+* **store:** answer a stream's first event of a type without replaying the stream ([#13](https://github.com/getmilpa/event-store/issues/13)) ([d8407db](https://github.com/getmilpa/event-store/commit/d8407db44f78ec550bddbc5e4e0513536fe54657))
+
 ## [0.3.2](https://github.com/getmilpa/event-store/compare/v0.3.1...v0.3.2) (2026-09-29)
 
 
